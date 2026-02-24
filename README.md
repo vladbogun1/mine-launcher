@@ -33,6 +33,32 @@ mvn -B package
 - Если порт занят, плагин может автоматически пробовать следующий порт (настраивается `server.allowPortAutoIncrement` и `server.maxPortRetries`).
 - Если файл из `mods/configs/resourcePacks` отсутствует в `repository`, API вернёт JSON-ошибку `500` (вместо пустого ответа), и причина попадёт в лог сервера.
 
+
+### Структура файлов на сервере
+После первого запуска плагина структура в `plugins/ServerDrivenModpack/` должна выглядеть так:
+
+```text
+plugins/
+└── ServerDrivenModpack/
+    ├── config.yml               # основной конфиг плагина (версии, URL, список файлов)
+    ├── checksums.yml            # кэш SHA-256, генерируется автоматически
+    └── repository/              # корень файлов, которые раздаются лаунчеру
+        ├── mods/
+        │   └── *.jar
+        ├── configs/
+        │   └── ...
+        └── resourcepacks/
+            └── *.zip
+```
+
+Важно:
+- `file` в секциях `mods/configs/resourcePacks` указывается **относительно `repository/`**.
+  - пример для мода: `mods/sodium-fabric.jar`
+  - пример для конфига: `configs/example.json`
+  - пример для ресурспака: `resourcepacks/example.zip`
+- `path` в секции `configs` — это путь, куда файл должен попасть у клиента (например, `config/example.json`).
+- Если `sha256` пустой, плагин посчитает его автоматически и сохранит в `checksums.yml`.
+
 ## 2) Лаунчер (Electron + Node.js)
 
 ### Возможности
