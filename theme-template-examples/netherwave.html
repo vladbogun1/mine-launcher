@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Netherwave Theme</title>
+  <style>
+    body { margin:0; min-height:100vh; color:#ffe7ff; font-family: 'Trebuchet MS', sans-serif;
+      background: radial-gradient(circle at 20% 10%, #7a2cff 0%, #2d0f52 30%, #12071f 70%),
+                  linear-gradient(120deg, #2d0f52, #671e66, #ff4a6e);
+      background-blend-mode: screen, normal; display:grid; place-items:center; }
+    .shell { width:min(940px, 92vw); border:1px solid rgba(255,178,232,.35); border-radius:20px;
+      background:rgba(18,7,31,.72); box-shadow:0 18px 60px rgba(0,0,0,.45); overflow:hidden; }
+    .head { padding:24px 28px; border-bottom:1px solid rgba(255,170,220,.22); }
+    .head h1 { margin:0; font-size:56px; letter-spacing:2px; }
+    .head p { margin:8px 0 0; opacity:.85; }
+    .body { padding:20px 28px; display:grid; gap:12px; }
+    .card { border-radius:12px; padding:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,184,223,.2); }
+    .actions{display:flex; gap:10px}
+    .btn{padding:10px 14px; border:none; border-radius:10px; color:#fff; font-weight:700; cursor:pointer;
+      background:linear-gradient(135deg,#ff4a6e,#ff9f43)}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="head">
+      <h1>NETHERWAVE</h1>
+      <p>Неоновая тема для мистических PvE / RPG сборок.</p>
+    </div>
+    <div class="body">
+      <div class="card">Синхронизация модпака, конфигов и ресурс-паков перед запуском.</div>
+      <div class="card">Поддержка серверных брендированных тем через `theme.html` / `themeUrl`.</div>
+      <div class="actions">
+        <button class="btn">Скачать / Обновить</button>
+        <button class="btn">Играть</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

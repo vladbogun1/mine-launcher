@@ -10,6 +10,7 @@
 ### Возможности
 - Для каждой сборки можно хранить кастомную тему интерфейса на сервере: по умолчанию лаунчер запрашивает `http(s)://<host>:<port>/theme.html` (или `themeUrl` из манифеста).
 - Разрешены HTTP и HTTPS; для HTTP лаунчер показывает предупреждение о рисках безопасности.
+- В репозитории добавлены примеры кастомных тем: `theme-template-examples/prado.html` и `theme-template-examples/netherwave.html` (ресурсы: `theme-template-examples/assets/`).
 - REST API `GET /api/modpack` с данными:
   - `minecraftVersion`
   - `javaVersion`
@@ -66,6 +67,7 @@ plugins/
 ### Возможности
 - Для каждой сборки можно хранить кастомную тему интерфейса на сервере: по умолчанию лаунчер запрашивает `http(s)://<host>:<port>/theme.html` (или `themeUrl` из манифеста).
 - Разрешены HTTP и HTTPS; для HTTP лаунчер показывает предупреждение о рисках безопасности.
+- В репозитории добавлены примеры кастомных тем: `theme-template-examples/prado.html` и `theme-template-examples/netherwave.html` (ресурсы: `theme-template-examples/assets/`).
 - Запрос манифеста с сервера.
 - Дифф локальных файлов и manifest-файлов.
 - Скачивание отсутствующих/устаревших файлов.
