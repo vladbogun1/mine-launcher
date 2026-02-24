@@ -145,8 +145,8 @@ public class ModpackPlugin extends JavaPlugin {
     private JsonArray buildEntriesArray(List<Map<?, ?>> entries, String typeDirectory) throws IOException {
         JsonArray jsonArray = new JsonArray();
         for (Map<?, ?> rawEntry : entries) {
-            String file = rawEntry.getOrDefault("file", "").toString();
-            String sha256 = rawEntry.getOrDefault("sha256", "").toString();
+            String file = String.valueOf(rawEntry.get("file") == null ? "" : rawEntry.get("file"));
+            String sha256 = String.valueOf(rawEntry.get("sha256") == null ? "" : rawEntry.get("sha256"));
 
             if (sha256.isBlank()) {
                 sha256 = resolveChecksum(file);
