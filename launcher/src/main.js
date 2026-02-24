@@ -230,23 +230,45 @@ async function existsAndMatchHash(filePath, expectedHash) {
   }
 }
 
-function downloadFile(url, destination) {
+function downloadFile(url, destination, redirectCount = 0) {
   return new Promise((resolve, reject) => {
-    const output = createWriteStream(destination);
     const parsed = new URL(url);
     const client = parsed.protocol === 'http:' ? http : https;
 
     client.get(url, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`Failed to download ${url}, status=${res.statusCode}`));
+      const status = Number(res.statusCode || 0);
+      const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+
+      if (redirectStatuses.has(status)) {
+        if (redirectCount >= 10) {
+          reject(new Error(`Too many redirects while downloading ${url}`));
+          return;
+        }
+
+        const location = res.headers.location;
+        if (!location) {
+          reject(new Error(`Redirect response without location for ${url}`));
+          return;
+        }
+
+        const nextUrl = new URL(location, url).toString();
+        res.resume();
+        downloadFile(nextUrl, destination, redirectCount + 1).then(resolve).catch(reject);
         return;
       }
 
+      if (status !== 200) {
+        reject(new Error(`Failed to download ${url}, status=${status}`));
+        return;
+      }
+
+      const output = createWriteStream(destination);
       res.pipe(output);
       output.on('finish', () => {
         output.close();
         resolve();
       });
+      output.on('error', reject);
     }).on('error', reject);
   });
 }
