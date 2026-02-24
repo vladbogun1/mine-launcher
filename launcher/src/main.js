@@ -5,11 +5,12 @@ const { createWriteStream } = require('fs');
 const crypto = require('crypto');
 const AdmZip = require('adm-zip');
 const https = require('https');
+const http = require('http');
 const { Client, Authenticator } = require('minecraft-launcher-core');
 
 const launcher = new Client();
 const appState = {
-  manifest: null,
+  manifests: {},
   root: path.join(app.getPath('home'), '.mine-launcher'),
   logLines: []
 };
@@ -17,14 +18,14 @@ const appState = {
 function log(message) {
   const line = `[${new Date().toISOString()}] ${message}`;
   appState.logLines.push(line);
-  if (appState.logLines.length > 200) appState.logLines.shift();
+  if (appState.logLines.length > 500) appState.logLines.shift();
   BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('log', line));
 }
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
-    width: 980,
-    height: 680,
+    width: 1200,
+    height: 780,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js')
     }
@@ -44,31 +45,121 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.handle('fetch-manifest', async (_event, apiUrl) => {
+function buildsFilePath() {
+  return path.join(appState.root, 'builds.json');
+}
+
+async function loadBuilds() {
+  await fs.mkdir(appState.root, { recursive: true });
+  try {
+    const content = await fs.readFile(buildsFilePath(), 'utf8');
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveBuilds(builds) {
+  await fs.mkdir(appState.root, { recursive: true });
+  await fs.writeFile(buildsFilePath(), JSON.stringify(builds, null, 2));
+}
+
+function normalizeProtocol(protocol) {
+  return protocol === 'https' ? 'https' : 'http';
+}
+
+function buildApiUrl(build) {
+  return `${build.protocol}://${build.host}:${build.port}/api/modpack`;
+}
+
+function buildThemeUrl(build, manifest) {
+  if (manifest && manifest.themeUrl) {
+    return manifest.themeUrl;
+  }
+  return `${build.protocol}://${build.host}:${build.port}/theme.html`;
+}
+
+ipcMain.handle('list-builds', async () => loadBuilds());
+
+ipcMain.handle('create-build', async (_event, payload) => {
+  const builds = await loadBuilds();
+  const now = Date.now();
+  const build = {
+    id: `build-${now}`,
+    name: (payload.name || `${payload.host}:${payload.port}`).trim(),
+    host: payload.host.trim(),
+    port: Number(payload.port || 7777),
+    protocol: normalizeProtocol(payload.protocol || 'http'),
+    createdAt: now
+  };
+  builds.push(build);
+  await saveBuilds(builds);
+  log(`Build added: ${build.name} (${build.protocol}://${build.host}:${build.port})`);
+  return build;
+});
+
+ipcMain.handle('fetch-manifest', async (_event, buildId) => {
+  const builds = await loadBuilds();
+  const build = builds.find((b) => b.id === buildId);
+  if (!build) throw new Error('Build not found.');
+
+  const apiUrl = buildApiUrl(build);
   log(`Fetching manifest from ${apiUrl}`);
+
   const response = await fetch(apiUrl);
   if (!response.ok) {
     throw new Error(`API request failed with ${response.status}`);
   }
-  appState.manifest = await response.json();
-  return appState.manifest;
+
+  const manifest = await response.json();
+  appState.manifests[build.id] = manifest;
+  return {
+    manifest,
+    apiUrl,
+    warning: build.protocol === 'http' ? 'Using HTTP without TLS. Only use trusted servers.' : null,
+    themeUrl: buildThemeUrl(build, manifest)
+  };
+});
+
+ipcMain.handle('load-theme', async (_event, buildId) => {
+  const builds = await loadBuilds();
+  const build = builds.find((b) => b.id === buildId);
+  if (!build) throw new Error('Build not found.');
+  const manifest = appState.manifests[build.id];
+  const themeUrl = buildThemeUrl(build, manifest);
+
+  try {
+    const response = await fetch(themeUrl);
+    if (!response.ok) {
+      return { ok: false, themeUrl, html: '' };
+    }
+    const html = await response.text();
+    return { ok: true, themeUrl, html };
+  } catch {
+    return { ok: false, themeUrl, html: '' };
+  }
 });
 
 ipcMain.handle('get-logs', async () => appState.logLines);
 
-ipcMain.handle('sync-files', async () => {
-  if (!appState.manifest) throw new Error('Manifest is not loaded.');
-  await fs.mkdir(appState.root, { recursive: true });
+ipcMain.handle('sync-files', async (_event, buildId) => {
+  const manifest = appState.manifests[buildId];
+  if (!manifest) throw new Error('Manifest is not loaded.');
+
+  const buildRoot = path.join(appState.root, 'instances', buildId);
+  await fs.mkdir(buildRoot, { recursive: true });
+
   const targets = [
-    ...appState.manifest.mods.map((x) => ({ ...x, targetPath: `mods/${path.basename(x.file || x.name)}` })),
-    ...appState.manifest.configs.map((x) => ({ ...x, targetPath: x.path })),
-    ...appState.manifest.resourcePacks.map((x) => ({ ...x, targetPath: `resourcepacks/${path.basename(x.file || x.name)}` }))
+    ...(manifest.mods || []).map((x) => ({ ...x, targetPath: `mods/${path.basename(x.file || x.name || 'mod.jar')}` })),
+    ...(manifest.configs || []).map((x) => ({ ...x, targetPath: x.path })),
+    ...(manifest.resourcePacks || []).map((x) => ({ ...x, targetPath: `resourcepacks/${path.basename(x.file || x.name || 'pack.zip')}` }))
   ];
 
   let index = 0;
   for (const item of targets) {
     index += 1;
-    const absolutePath = path.join(appState.root, item.targetPath);
+    const absolutePath = path.join(buildRoot, item.targetPath);
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
 
     const needsDownload = !(await existsAndMatchHash(absolutePath, item.sha256));
@@ -89,18 +180,20 @@ ipcMain.handle('sync-files', async () => {
     );
   }
 
-  return { root: appState.root, total: targets.length };
+  return { root: buildRoot, total: targets.length };
 });
 
-ipcMain.handle('launch-game', async () => {
-  if (!appState.manifest) throw new Error('Manifest is not loaded.');
+ipcMain.handle('launch-game', async (_event, buildId) => {
+  const manifest = appState.manifests[buildId];
+  if (!manifest) throw new Error('Manifest is not loaded.');
 
-  const javaPath = await ensureJava(appState.manifest.javaVersion || '17');
-  const versionNumber = appState.manifest.minecraftVersion;
+  const buildRoot = path.join(appState.root, 'instances', buildId);
+  const javaPath = await ensureJava(manifest.javaVersion || '17');
+  const versionNumber = manifest.minecraftVersion;
 
   const options = {
     authorization: Authenticator.getAuth('MineLauncherPlayer'),
-    root: appState.root,
+    root: buildRoot,
     version: {
       number: versionNumber,
       type: 'release'
@@ -110,15 +203,15 @@ ipcMain.handle('launch-game', async () => {
       min: '2G'
     },
     javaPath,
-    server: appState.manifest.autoConnect
-      ? { ip: appState.manifest.autoConnect.host, port: appState.manifest.autoConnect.port }
+    server: manifest.autoConnect
+      ? { ip: manifest.autoConnect.host, port: manifest.autoConnect.port }
       : undefined,
     overrides: {
       detached: false
     }
   };
 
-  log(`Launching Minecraft ${versionNumber} with Java ${javaPath}`);
+  log(`Launching Minecraft ${versionNumber} for ${buildId} with Java ${javaPath}`);
   launcher.launch(options);
 
   launcher.on('debug', (line) => log(`[MC] ${line}`));
@@ -140,7 +233,10 @@ async function existsAndMatchHash(filePath, expectedHash) {
 function downloadFile(url, destination) {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(destination);
-    https.get(url, (res) => {
+    const parsed = new URL(url);
+    const client = parsed.protocol === 'http:' ? http : https;
+
+    client.get(url, (res) => {
       if (res.statusCode !== 200) {
         reject(new Error(`Failed to download ${url}, status=${res.statusCode}`));
         return;
