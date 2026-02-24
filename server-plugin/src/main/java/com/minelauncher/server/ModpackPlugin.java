@@ -116,8 +116,16 @@ public class ModpackPlugin extends JavaPlugin {
             return;
         }
 
-        JsonObject response = buildManifest();
-        respond(exchange, 200, gson.toJson(response), "application/json");
+        try {
+            JsonObject response = buildManifest();
+            respond(exchange, 200, gson.toJson(response), "application/json");
+        } catch (Exception ex) {
+            getLogger().severe("Failed to build modpack manifest: " + ex.getMessage());
+            JsonObject error = new JsonObject();
+            error.addProperty("error", "Failed to build modpack manifest");
+            error.addProperty("message", ex.getMessage());
+            respond(exchange, 500, gson.toJson(error), "application/json");
+        }
     }
 
     private void handleFileRequest(HttpExchange exchange) throws IOException {

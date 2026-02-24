@@ -31,6 +31,7 @@ mvn -B package
 - `server.publicBaseUrl` должен указывать на HTTPS URL, доступный лаунчеру.
 - Сами файлы должны лежать в `repository/` относительно data folder плагина.
 - Если порт занят, плагин может автоматически пробовать следующий порт (настраивается `server.allowPortAutoIncrement` и `server.maxPortRetries`).
+- Если файл из `mods/configs/resourcePacks` отсутствует в `repository`, API вернёт JSON-ошибку `500` (вместо пустого ответа), и причина попадёт в лог сервера.
 
 ## 2) Лаунчер (Electron + Node.js)
 
