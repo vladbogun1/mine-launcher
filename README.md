@@ -31,7 +31,7 @@ mvn -B package
 
 ### Конфигурация
 Файл: `server-plugin/src/main/resources/config.yml`
-- `server.publicBaseUrl` должен указывать на HTTPS URL, доступный лаунчеру.
+- `server.publicBaseUrl` — публичный базовый URL для ссылок в манифесте. Важно указывать порт (например, `http://150.136.127.73:25570`). Если оставить пустым, плагин соберёт URL из `server.publicScheme`, `server.publicHost` и фактического API-порта.
 - Сами файлы должны лежать в `repository/` относительно data folder плагина.
 - Если порт занят, плагин может автоматически пробовать следующий порт (настраивается `server.allowPortAutoIncrement` и `server.maxPortRetries`).
 - Если файл из `mods/configs/resourcePacks` отсутствует в `repository`, API вернёт JSON-ошибку `500` (вместо пустого ответа), и причина попадёт в лог сервера.

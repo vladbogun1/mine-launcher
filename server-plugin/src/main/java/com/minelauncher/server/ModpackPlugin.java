@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.BindException;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -30,6 +31,7 @@ public class ModpackPlugin extends JavaPlugin {
     private HttpServer httpServer;
     private Path repositoryRoot;
     private Path checksumCacheFile;
+    private int activeApiPort;
 
     @Override
     public void onEnable() {
@@ -94,6 +96,7 @@ public class ModpackPlugin extends JavaPlugin {
                 httpServer.setExecutor(null);
                 httpServer.start();
 
+                activeApiPort = currentPort;
                 if (currentPort != basePort) {
                     getLogger().warning("Configured port " + basePort + " was busy. API started on fallback port " + currentPort + ".");
                 }
@@ -205,12 +208,31 @@ public class ModpackPlugin extends JavaPlugin {
     }
 
     private String buildPublicUrl(String relativeFile) {
-        String base = getConfig().getString("server.publicBaseUrl", "http://localhost:8080");
+        String configuredBase = getConfig().getString("server.publicBaseUrl", "").trim();
         String filesPath = getConfig().getString("server.filesPath", "/files/");
+        String cleanPath = filesPath.startsWith("/") ? filesPath.substring(1) : filesPath;
+
+        String base = configuredBase;
+        if (base.isBlank()) {
+            String host = getConfig().getString("server.publicHost", "localhost");
+            String scheme = getConfig().getString("server.publicScheme", "http");
+            base = scheme + "://" + host + ":" + activeApiPort;
+        } else {
+            try {
+                URI uri = URI.create(base);
+                if (uri.getPort() == -1 && activeApiPort > 0) {
+                    String authority = uri.getHost() + ":" + activeApiPort;
+                    URI withPort = new URI(uri.getScheme(), authority, uri.getPath(), uri.getQuery(), uri.getFragment());
+                    base = withPort.toString();
+                }
+            } catch (Exception ignored) {
+                // Keep configured base as-is if URI parsing failed.
+            }
+        }
+
         if (!base.endsWith("/")) {
             base += "/";
         }
-        String cleanPath = filesPath.startsWith("/") ? filesPath.substring(1) : filesPath;
         return base + cleanPath + relativeFile;
     }
 

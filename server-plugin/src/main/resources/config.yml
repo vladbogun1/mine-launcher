@@ -10,7 +10,9 @@ server:
   maxPortRetries: 20
   apiPath: "/api/modpack"
   filesPath: "/files/"
-  publicBaseUrl: "https://example.com"
+  publicBaseUrl: "" # optional; if empty launcher URLs are built from publicScheme/publicHost/server.port
+  publicScheme: "http"
+  publicHost: "localhost"
 
 autoConnect:
   host: "play.example.com"
