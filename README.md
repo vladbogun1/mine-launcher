@@ -36,6 +36,7 @@ mvn -B package
 - Сами файлы должны лежать в `repository/` относительно data folder плагина.
 - Если порт занят, плагин может автоматически пробовать следующий порт (настраивается `server.allowPortAutoIncrement` и `server.maxPortRetries`).
 - Если файл из `mods/configs/resourcePacks` отсутствует в `repository`, API вернёт JSON-ошибку `500` (вместо пустого ответа), и причина попадёт в лог сервера.
+- Команда `/sdmreload` (permission `serverdrivenmodpack.reload`) перезагружает конфиг и заново поднимает API без рестарта всего сервера.
 
 
 ### Структура файлов на сервере

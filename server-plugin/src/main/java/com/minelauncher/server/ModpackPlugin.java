@@ -6,6 +6,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -57,6 +59,40 @@ public class ModpackPlugin extends JavaPlugin {
         if (httpServer != null) {
             httpServer.stop(1);
         }
+    }
+
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!"sdmreload".equalsIgnoreCase(command.getName())) {
+            return false;
+        }
+
+        if (!sender.hasPermission("serverdrivenmodpack.reload")) {
+            sender.sendMessage("§cYou don't have permission to run this command.");
+            return true;
+        }
+
+        try {
+            reloadPluginState();
+            sender.sendMessage("§aServerDrivenModpack reloaded successfully.");
+        } catch (Exception ex) {
+            sender.sendMessage("§cFailed to reload plugin: " + ex.getMessage());
+            getLogger().severe("Failed to reload plugin: " + ex.getMessage());
+        }
+        return true;
+    }
+
+    private synchronized void reloadPluginState() throws IOException {
+        if (httpServer != null) {
+            httpServer.stop(1);
+            httpServer = null;
+        }
+
+        reloadConfig();
+        getConfig().options().copyDefaults(true);
+        saveConfig();
+        startApiServer();
     }
 
     private void loadChecksumCache() {
