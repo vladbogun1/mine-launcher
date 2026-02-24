@@ -57,6 +57,7 @@
       <div class="card">
         <div class="title">Управление</div>
         <p id="warningText" class="warning hidden"></p>
+        <div class="field" style="margin-bottom:8px"><label>Ник для запуска (offline-mode/pirate)</label><input id="usernameInput" value="Player" /></div>
         <div class="progress"><div id="bar"></div></div>
         <p id="progressText" class="muted">Ожидание действий.</p>
         <div class="actions">
@@ -78,6 +79,7 @@
       <h3 style="margin-top:0">Добавить сборку</h3>
       <div class="field"><label>Название</label><input id="nameInput" placeholder="Например: Prado FAMQ" /></div>
       <div class="field"><label>Сервер (IP / домен)</label><input id="hostInput" placeholder="150.136.127.73" /></div>
+      <div class="field"><label>Ник по умолчанию</label><input id="defaultUsernameInput" value="Player" /></div>
       <div class="row">
         <div class="field" style="flex:1"><label>Порт</label><input id="portInput" type="number" value="7777" /></div>
         <div class="field" style="flex:1"><label>Протокол</label><select id="protocolInput"><option value="http">http</option><option value="https">https</option></select></div>
@@ -111,6 +113,8 @@
   const hostInput = document.getElementById('hostInput');
   const portInput = document.getElementById('portInput');
   const protocolInput = document.getElementById('protocolInput');
+  const defaultUsernameInput = document.getElementById('defaultUsernameInput');
+  const usernameInput = document.getElementById('usernameInput');
 
   let activeBuild = null;
 
@@ -142,6 +146,7 @@
     show('build');
     buildTitle.textContent = build.name;
     apiMeta.textContent = `${build.protocol}://${build.host}:${build.port}`;
+    usernameInput.value = build.username || 'Player';
     warningText.classList.add('hidden');
     themePreview.innerHTML = 'Загрузка темы...';
     mods.textContent = 'Загрузка манифеста...';
@@ -176,13 +181,15 @@
       name: nameInput.value,
       host: hostInput.value,
       port: Number(portInput.value || 7777),
-      protocol: protocolInput.value
+      protocol: protocolInput.value,
+      username: defaultUsernameInput.value || 'Player'
     });
     addModal.classList.add('hidden');
     nameInput.value = '';
     hostInput.value = '';
     portInput.value = 7777;
     protocolInput.value = 'http';
+    defaultUsernameInput.value = 'Player';
     await loadBuilds();
     openBuild(build);
   };
@@ -206,7 +213,8 @@
   playBtn.onclick = async () => {
     if (!activeBuild) return;
     try {
-      await window.launcherApi.launchGame(activeBuild.id);
+      await window.launcherApi.updateBuildUsername(activeBuild.id, usernameInput.value);
+      await window.launcherApi.launchGame(activeBuild.id, usernameInput.value);
     } catch (e) {
       appendLog('ERROR: ' + e.message);
     }

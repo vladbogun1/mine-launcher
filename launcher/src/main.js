@@ -91,12 +91,23 @@ ipcMain.handle('create-build', async (_event, payload) => {
     host: payload.host.trim(),
     port: Number(payload.port || 7777),
     protocol: normalizeProtocol(payload.protocol || 'http'),
-    createdAt: now
+    createdAt: now,
+    username: (payload.username || 'Player').trim() || 'Player'
   };
   builds.push(build);
   await saveBuilds(builds);
   log(`Build added: ${build.name} (${build.protocol}://${build.host}:${build.port})`);
   return build;
+});
+
+
+ipcMain.handle('update-build-username', async (_event, buildId, username) => {
+  const builds = await loadBuilds();
+  const idx = builds.findIndex((b) => b.id === buildId);
+  if (idx === -1) throw new Error('Build not found.');
+  builds[idx].username = (username || 'Player').trim() || 'Player';
+  await saveBuilds(builds);
+  return builds[idx];
 });
 
 ipcMain.handle('fetch-manifest', async (_event, buildId) => {
@@ -183,16 +194,20 @@ ipcMain.handle('sync-files', async (_event, buildId) => {
   return { root: buildRoot, total: targets.length };
 });
 
-ipcMain.handle('launch-game', async (_event, buildId) => {
+ipcMain.handle('launch-game', async (_event, buildId, username) => {
   const manifest = appState.manifests[buildId];
   if (!manifest) throw new Error('Manifest is not loaded.');
+
+  const builds = await loadBuilds();
+  const build = builds.find((b) => b.id === buildId);
+  const launchName = (username || build?.username || 'Player').trim() || 'Player';
 
   const buildRoot = path.join(appState.root, 'instances', buildId);
   const javaPath = await ensureJava(manifest.javaVersion || '17');
   const versionNumber = manifest.minecraftVersion;
 
   const options = {
-    authorization: Authenticator.getAuth('MineLauncherPlayer'),
+    authorization: Authenticator.getAuth(launchName),
     root: buildRoot,
     version: {
       number: versionNumber,
@@ -206,12 +221,15 @@ ipcMain.handle('launch-game', async (_event, buildId) => {
     server: manifest.autoConnect
       ? { ip: manifest.autoConnect.host, port: manifest.autoConnect.port }
       : undefined,
+    customArgs: manifest.autoConnect
+      ? ['--server', String(manifest.autoConnect.host), '--port', String(manifest.autoConnect.port)]
+      : [],
     overrides: {
       detached: false
     }
   };
 
-  log(`Launching Minecraft ${versionNumber} for ${buildId} with Java ${javaPath}`);
+  log(`Launching Minecraft ${versionNumber} for ${buildId} as ${launchName} with Java ${javaPath}`);
   launcher.launch(options);
 
   launcher.on('debug', (line) => log(`[MC] ${line}`));
