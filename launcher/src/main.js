@@ -7,6 +7,8 @@ const AdmZip = require('adm-zip');
 const https = require('https');
 const http = require('http');
 const { Client, Authenticator } = require('minecraft-launcher-core');
+const zlib = require('zlib');
+const nbt = require('prismarine-nbt');
 
 const launcher = new Client();
 const appState = {
@@ -14,6 +16,19 @@ const appState = {
   root: path.join(app.getPath('home'), '.mine-launcher'),
   logLines: []
 };
+
+
+function parseNbtBuffer(buffer) {
+  return new Promise((resolve, reject) => {
+    nbt.parse(buffer, (err, data) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(data);
+    });
+  });
+}
 
 function log(message) {
   const line = `[${new Date().toISOString()}] ${message}`;
@@ -215,6 +230,7 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
 
   const buildRoot = path.join(appState.root, 'instances', buildId);
   const javaPath = await ensureJava(manifest.javaVersion || '17');
+  await ensureServerInDat(manifest, buildRoot, build?.name || buildId);
   await ensureFabricApiIfNeeded(manifest, buildRoot);
   const versionConfig = await ensureGameVersionProfile(manifest, buildRoot);
 
@@ -249,6 +265,66 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
 
   return { started: true };
 });
+
+async function ensureServerInDat(manifest, buildRoot, buildName) {
+  if (!manifest.autoConnect?.host || !manifest.autoConnect?.port) {
+    return;
+  }
+
+  const serversDatPath = path.join(buildRoot, 'servers.dat');
+  const targetIp = `${manifest.autoConnect.host}:${manifest.autoConnect.port}`;
+  let entries = [];
+
+  try {
+    const raw = await fs.readFile(serversDatPath);
+    const parsed = await parseNbtBuffer(raw);
+    const root = parsed.parsed?.value || {};
+    const list = root.servers?.value?.value || [];
+    entries = list.map((item) => {
+      const value = item?.value || {};
+      return {
+        name: String(value.name?.value || 'Server'),
+        ip: String(value.ip?.value || ''),
+        acceptTextures: value.acceptTextures?.value === 1
+      };
+    }).filter((x) => x.ip);
+  } catch {
+    entries = [];
+  }
+
+  const existing = entries.find((x) => x.ip === targetIp);
+  if (!existing) {
+    entries.unshift({
+      name: buildName || manifest.autoConnect.host,
+      ip: targetIp,
+      acceptTextures: true
+    });
+  }
+
+  const nbtData = {
+    type: 'compound',
+    name: '',
+    value: {
+      servers: {
+        type: 'list',
+        value: {
+          type: 'compound',
+          value: entries.map((entry) => ({
+            name: { type: 'string', value: entry.name },
+            ip: { type: 'string', value: entry.ip },
+            acceptTextures: { type: 'byte', value: entry.acceptTextures ? 1 : 0 }
+          }))
+        }
+      }
+    }
+  };
+
+  await fs.mkdir(buildRoot, { recursive: true });
+  const encoded = nbt.writeUncompressed(nbtData);
+  const compressed = zlib.gzipSync(encoded);
+  await fs.writeFile(serversDatPath, compressed);
+  log(`Updated servers.dat with ${targetIp}`);
+}
 
 async function ensureFabricApiIfNeeded(manifest, buildRoot) {
   const loaderType = String(manifest.loader?.type || 'vanilla').toLowerCase();

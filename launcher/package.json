@@ -31,7 +31,8 @@
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
-    "minecraft-launcher-core": "^3.18.2"
+    "minecraft-launcher-core": "^3.18.2",
+    "prismarine-nbt": "^2.7.0"
   },
   "devDependencies": {
     "electron": "^31.2.1",
