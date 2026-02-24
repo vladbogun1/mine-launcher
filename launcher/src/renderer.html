@@ -61,8 +61,7 @@
         <div class="progress"><div id="bar"></div></div>
         <p id="progressText" class="muted">Ожидание действий.</p>
         <div class="actions">
-          <button id="syncBtn" class="btn">Скачать / Обновить</button>
-          <button id="playBtn" class="btn secondary" disabled>Играть</button>
+          <button id="playBtn" class="btn">Играть</button>
         </div>
         <div style="margin-top:10px" id="mods" class="muted"></div>
       </div>
@@ -102,7 +101,6 @@
   const apiMeta = document.getElementById('apiMeta');
   const themePreview = document.getElementById('themePreview');
   const warningText = document.getElementById('warningText');
-  const syncBtn = document.getElementById('syncBtn');
   const playBtn = document.getElementById('playBtn');
   const mods = document.getElementById('mods');
   const bar = document.getElementById('bar');
@@ -135,8 +133,13 @@
     builds.forEach((b) => {
       const card = document.createElement('div');
       card.className = 'card';
-      card.innerHTML = `<div class="title">${b.name}</div><div class="muted">${b.protocol}://${b.host}:${b.port}</div><div class="actions"><button class="btn">Открыть</button></div>`;
-      card.querySelector('button').onclick = () => openBuild(b);
+      card.innerHTML = `<div class="title">${b.name}</div><div class="muted">${b.protocol}://${b.host}:${b.port}</div><div class="actions"><button class="btn open">Открыть</button><button class="btn secondary del">Удалить</button></div>`;
+      card.querySelector('.open').onclick = () => openBuild(b);
+      card.querySelector('.del').onclick = async () => {
+        if (!confirm(`Удалить сборку ${b.name}?`)) return;
+        await window.launcherApi.deleteBuild(b.id);
+        await loadBuilds();
+      };
       buildsGrid.appendChild(card);
     });
   }
@@ -150,7 +153,6 @@
     warningText.classList.add('hidden');
     themePreview.innerHTML = 'Загрузка темы...';
     mods.textContent = 'Загрузка манифеста...';
-    playBtn.disabled = true;
 
     try {
       const { manifest, warning, themeUrl } = await window.launcherApi.fetchManifest(build.id);
@@ -196,27 +198,19 @@
 
   backBtn.onclick = async () => { show('home'); await loadBuilds(); };
 
-  syncBtn.onclick = async () => {
-    if (!activeBuild) return;
-    try {
-      bar.style.width = '0%';
-      progressText.textContent = 'Синхронизация...';
-      await window.launcherApi.syncFiles(activeBuild.id);
-      progressText.textContent = 'Синхронизация завершена.';
-      playBtn.disabled = false;
-    } catch (e) {
-      appendLog('ERROR: ' + e.message);
-      progressText.textContent = 'Ошибка синхронизации.';
-    }
-  };
-
   playBtn.onclick = async () => {
     if (!activeBuild) return;
     try {
+      bar.style.width = '0%';
+      progressText.textContent = 'Проверка и обновление файлов...';
       await window.launcherApi.updateBuildUsername(activeBuild.id, usernameInput.value);
+      await window.launcherApi.fetchManifest(activeBuild.id);
+      await window.launcherApi.syncFiles(activeBuild.id);
+      progressText.textContent = 'Запуск игры...';
       await window.launcherApi.launchGame(activeBuild.id, usernameInput.value);
     } catch (e) {
       appendLog('ERROR: ' + e.message);
+      progressText.textContent = 'Ошибка запуска.';
     }
   };
 

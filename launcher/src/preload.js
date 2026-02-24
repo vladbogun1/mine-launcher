@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('launcherApi', {
   listBuilds: () => ipcRenderer.invoke('list-builds'),
   createBuild: (payload) => ipcRenderer.invoke('create-build', payload),
+  deleteBuild: (buildId) => ipcRenderer.invoke('delete-build', buildId),
   fetchManifest: (buildId) => ipcRenderer.invoke('fetch-manifest', buildId),
   updateBuildUsername: (buildId, username) => ipcRenderer.invoke('update-build-username', buildId, username),
   loadTheme: (buildId) => ipcRenderer.invoke('load-theme', buildId),

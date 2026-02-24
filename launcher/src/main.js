@@ -101,6 +101,17 @@ ipcMain.handle('create-build', async (_event, payload) => {
 });
 
 
+
+ipcMain.handle('delete-build', async (_event, buildId) => {
+  const builds = await loadBuilds();
+  const filtered = builds.filter((b) => b.id !== buildId);
+  await saveBuilds(filtered);
+  delete appState.manifests[buildId];
+  await fs.rm(path.join(appState.root, 'instances', buildId), { recursive: true, force: true });
+  log(`Build deleted: ${buildId}`);
+  return { ok: true };
+});
+
 ipcMain.handle('update-build-username', async (_event, buildId, username) => {
   const builds = await loadBuilds();
   const idx = builds.findIndex((b) => b.id === buildId);
@@ -204,15 +215,12 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
 
   const buildRoot = path.join(appState.root, 'instances', buildId);
   const javaPath = await ensureJava(manifest.javaVersion || '17');
-  const versionNumber = manifest.minecraftVersion;
+  const versionConfig = await ensureGameVersionProfile(manifest, buildRoot);
 
   const options = {
     authorization: Authenticator.getAuth(launchName),
     root: buildRoot,
-    version: {
-      number: versionNumber,
-      type: 'release'
-    },
+    version: versionConfig,
     memory: {
       max: '4G',
       min: '2G'
@@ -232,7 +240,7 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
     }
   };
 
-  log(`Launching Minecraft ${versionNumber} for ${buildId} as ${launchName} with Java ${javaPath}`);
+  log(`Launching Minecraft ${versionConfig.number} for ${buildId} as ${launchName} with Java ${javaPath}`);
   launcher.launch(options);
 
   launcher.on('debug', (line) => log(`[MC] ${line}`));
@@ -240,6 +248,40 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
 
   return { started: true };
 });
+
+async function ensureGameVersionProfile(manifest, buildRoot) {
+  const mcVersion = manifest.minecraftVersion;
+  const loaderType = String(manifest.loader?.type || 'vanilla').toLowerCase();
+  const loaderVersion = manifest.loader?.version;
+
+  if (loaderType !== 'fabric' || !loaderVersion) {
+    return { number: mcVersion, type: 'release' };
+  }
+
+  const versionId = `fabric-loader-${loaderVersion}-${mcVersion}`;
+  const versionDir = path.join(buildRoot, 'versions', versionId);
+  const versionFile = path.join(versionDir, `${versionId}.json`);
+
+  try {
+    await fs.access(versionFile);
+  } catch {
+    await fs.mkdir(versionDir, { recursive: true });
+    const fabricProfileUrl = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}/${loaderVersion}/profile/json`;
+    log(`Downloading Fabric profile ${fabricProfileUrl}`);
+    const response = await fetch(fabricProfileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch Fabric profile: ${response.status}`);
+    }
+    const profile = await response.json();
+    await fs.writeFile(versionFile, JSON.stringify(profile, null, 2), 'utf8');
+  }
+
+  return {
+    number: mcVersion,
+    type: 'release',
+    custom: versionId
+  };
+}
 
 async function existsAndMatchHash(filePath, expectedHash) {
   try {
