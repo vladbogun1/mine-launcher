@@ -111,7 +111,7 @@ plugins/
 - Проверка SHA-256 после скачивания.
 - Сборка структуры инстанса (`mods/`, `config/`, `resourcepacks/`).
 - Запуск Minecraft через `minecraft-launcher-core`.
-- Auto-connect к серверу.
+- Auto-connect к серверу (через modern quickPlay, без устаревших JVM-флагов `--server/--port`).
 - Авто-установка Java 17 (Temurin) для Windows x64.
 - UI с главным экраном множества сборок, кнопкой «Добавить сборку», прогрессом, кнопками «Скачать / Обновить» и «Играть», встроенными логами.
 - Поле «Ник для запуска» для offline-mode серверов (без Microsoft/Xbox авторизации).

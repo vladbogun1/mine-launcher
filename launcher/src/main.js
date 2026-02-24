@@ -221,9 +221,12 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
     server: manifest.autoConnect
       ? { ip: manifest.autoConnect.host, port: manifest.autoConnect.port }
       : undefined,
-    customArgs: manifest.autoConnect
-      ? ['--server', String(manifest.autoConnect.host), '--port', String(manifest.autoConnect.port)]
-      : [],
+    quickPlay: manifest.autoConnect
+      ? {
+          type: 'multiplayer',
+          identifier: `${manifest.autoConnect.host}:${manifest.autoConnect.port}`
+        }
+      : undefined,
     overrides: {
       detached: false
     }
