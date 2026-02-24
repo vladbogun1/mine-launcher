@@ -36,6 +36,8 @@ public class ModpackPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        getConfig().options().copyDefaults(true);
+        saveConfig();
         repositoryRoot = getDataFolder().toPath().resolve("repository");
         checksumCacheFile = getDataFolder().toPath().resolve("checksums.yml");
 
