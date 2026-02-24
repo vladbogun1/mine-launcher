@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MineLauncher</title>
+  <style>
+    body { margin: 0; font-family: Inter, Arial, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .layout { display: grid; grid-template-columns: 1.2fr 1fr; height: 100vh; }
+    .left, .right { padding: 24px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .row { display: flex; gap: 12px; align-items: center; }
+    input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #374151; background: #0b1220; color: #fff; }
+    button { padding: 10px 16px; border-radius: 10px; border: none; background: linear-gradient(135deg, #3b82f6, #22d3ee); color: #fff; cursor: pointer; font-weight: 600; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .progress { width: 100%; height: 12px; border-radius: 999px; background: #1f2937; overflow: hidden; }
+    .progress > div { height: 12px; width: 0%; background: linear-gradient(90deg, #22c55e, #06b6d4); }
+    #mods { max-height: 240px; overflow: auto; }
+    #logs { height: 460px; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; }
+    .warning { color: #fbbf24; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="left">
+      <h1>Server-Driven Minecraft Launcher</h1>
+      <div class="card">
+        <label>Modpack API URL</label>
+        <div class="row">
+          <input id="apiUrl" value="https://example.com/api/modpack" />
+          <button id="loadBtn">Load</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mod list</h3>
+        <div id="mods">Load manifest to see mods.</div>
+      </div>
+      <div class="card">
+        <h3>Sync progress</h3>
+        <div class="progress"><div id="bar"></div></div>
+        <p id="progressText">No sync in progress.</p>
+        <p class="warning">Before launch, files are downloaded from remote URLs. Use only trusted HTTPS endpoints.</p>
+      </div>
+      <div class="row">
+        <button id="syncBtn" disabled>Synchronize files</button>
+        <button id="playBtn" disabled>Играть</button>
+      </div>
+    </div>
+    <div class="right">
+      <div class="card">
+        <h3>Launcher logs</h3>
+        <div id="logs"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apiUrl = document.getElementById('apiUrl');
+    const loadBtn = document.getElementById('loadBtn');
+    const syncBtn = document.getElementById('syncBtn');
+    const playBtn = document.getElementById('playBtn');
+    const mods = document.getElementById('mods');
+    const logs = document.getElementById('logs');
+    const bar = document.getElementById('bar');
+    const progressText = document.getElementById('progressText');
+    let manifestLoaded = false;
+
+    function appendLog(line) {
+      logs.textContent += line + '\n';
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    window.launcherApi.onLog(appendLog);
+    window.launcherApi.onProgress(({ current, total, file }) => {
+      const percent = Math.floor((current / total) * 100);
+      bar.style.width = percent + '%';
+      progressText.textContent = `${current}/${total}: ${file}`;
+    });
+
+    loadBtn.onclick = async () => {
+      try {
+        const manifest = await window.launcherApi.fetchManifest(apiUrl.value.trim());
+        mods.innerHTML = manifest.mods.map(m => `• ${m.name} ${m.version}`).join('<br>') || 'No mods in manifest.';
+        manifestLoaded = true;
+        syncBtn.disabled = false;
+        playBtn.disabled = true;
+      } catch (e) {
+        appendLog('ERROR: ' + e.message);
+      }
+    };
+
+    syncBtn.onclick = async () => {
+      if (!manifestLoaded) return;
+      try {
+        bar.style.width = '0%';
+        progressText.textContent = 'Sync started...';
+        await window.launcherApi.syncFiles();
+        progressText.textContent = 'Sync completed.';
+        playBtn.disabled = false;
+      } catch (e) {
+        appendLog('ERROR: ' + e.message);
+      }
+    };
+
+    playBtn.onclick = async () => {
+      try {
+        await window.launcherApi.launchGame();
+      } catch (e) {
+        appendLog('ERROR: ' + e.message);
+      }
+    };
+
+    window.launcherApi.getLogs().then((items) => items.forEach(appendLog));
+  </script>
+</body>
+</html>

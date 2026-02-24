@@ -1,0 +1,216 @@
+package com.minelauncher.server;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.java.JavaPlugin;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class ModpackPlugin extends JavaPlugin {
+    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private final Map<String, String> checksumCache = new ConcurrentHashMap<>();
+    private HttpServer httpServer;
+    private Path repositoryRoot;
+    private Path checksumCacheFile;
+
+    @Override
+    public void onEnable() {
+        saveDefaultConfig();
+        repositoryRoot = getDataFolder().toPath().resolve("repository");
+        checksumCacheFile = getDataFolder().toPath().resolve("checksums.yml");
+
+        try {
+            Files.createDirectories(repositoryRoot);
+            loadChecksumCache();
+            startApiServer();
+            getLogger().info("Server-driven modpack API started successfully.");
+        } catch (Exception ex) {
+            getLogger().severe("Failed to start modpack API: " + ex.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+        }
+    }
+
+    @Override
+    public void onDisable() {
+        if (httpServer != null) {
+            httpServer.stop(1);
+        }
+    }
+
+    private void loadChecksumCache() {
+        if (!Files.exists(checksumCacheFile)) {
+            return;
+        }
+        YamlConfiguration cacheYaml = YamlConfiguration.loadConfiguration(checksumCacheFile.toFile());
+        for (String key : cacheYaml.getKeys(false)) {
+            checksumCache.put(key, cacheYaml.getString(key, ""));
+        }
+    }
+
+    private void persistChecksumCache() throws IOException {
+        YamlConfiguration cacheYaml = new YamlConfiguration();
+        for (Map.Entry<String, String> entry : checksumCache.entrySet()) {
+            cacheYaml.set(entry.getKey(), entry.getValue());
+        }
+        cacheYaml.save(checksumCacheFile.toFile());
+    }
+
+    private void startApiServer() throws IOException {
+        FileConfiguration config = getConfig();
+        String host = config.getString("server.host", "0.0.0.0");
+        int port = config.getInt("server.port", 8080);
+        String apiPath = config.getString("server.apiPath", "/api/modpack");
+        String filesPath = config.getString("server.filesPath", "/files/");
+
+        httpServer = HttpServer.create(new InetSocketAddress(host, port), 0);
+        httpServer.createContext(apiPath, this::handleManifestRequest);
+        httpServer.createContext(filesPath, this::handleFileRequest);
+        httpServer.setExecutor(null);
+        httpServer.start();
+    }
+
+    private void handleManifestRequest(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            respond(exchange, 405, "Method Not Allowed", "text/plain");
+            return;
+        }
+
+        JsonObject response = buildManifest();
+        respond(exchange, 200, gson.toJson(response), "application/json");
+    }
+
+    private void handleFileRequest(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            respond(exchange, 405, "Method Not Allowed", "text/plain");
+            return;
+        }
+
+        String filesPath = getConfig().getString("server.filesPath", "/files/");
+        String requestPath = exchange.getRequestURI().getPath();
+        String relativePath = requestPath.replaceFirst("^" + filesPath, "");
+
+        Path target = repositoryRoot.resolve(relativePath).normalize();
+        if (!target.startsWith(repositoryRoot) || !Files.exists(target) || Files.isDirectory(target)) {
+            respond(exchange, 404, "File not found", "text/plain");
+            return;
+        }
+
+        exchange.getResponseHeaders().add("Content-Type", "application/octet-stream");
+        exchange.sendResponseHeaders(200, Files.size(target));
+        try (OutputStream os = exchange.getResponseBody(); InputStream is = Files.newInputStream(target)) {
+            is.transferTo(os);
+        }
+    }
+
+    private JsonObject buildManifest() throws IOException {
+        FileConfiguration cfg = getConfig();
+        JsonObject root = new JsonObject();
+
+        root.addProperty("minecraftVersion", cfg.getString("minecraftVersion"));
+        root.addProperty("javaVersion", cfg.getString("javaVersion"));
+
+        JsonObject loader = new JsonObject();
+        loader.addProperty("type", cfg.getString("loader.type", "vanilla"));
+        loader.addProperty("version", cfg.getString("loader.version", ""));
+        root.add("loader", loader);
+
+        JsonObject autoConnect = new JsonObject();
+        autoConnect.addProperty("host", cfg.getString("autoConnect.host", ""));
+        autoConnect.addProperty("port", cfg.getInt("autoConnect.port", 25565));
+        root.add("autoConnect", autoConnect);
+
+        root.add("mods", buildEntriesArray(cfg.getMapList("mods"), "mods"));
+        root.add("configs", buildEntriesArray(cfg.getMapList("configs"), "configs"));
+        root.add("resourcePacks", buildEntriesArray(cfg.getMapList("resourcePacks"), "resourcepacks"));
+        return root;
+    }
+
+    private JsonArray buildEntriesArray(List<Map<?, ?>> entries, String typeDirectory) throws IOException {
+        JsonArray jsonArray = new JsonArray();
+        for (Map<?, ?> rawEntry : entries) {
+            String file = rawEntry.getOrDefault("file", "").toString();
+            String sha256 = rawEntry.getOrDefault("sha256", "").toString();
+
+            if (sha256.isBlank()) {
+                sha256 = resolveChecksum(file);
+            }
+
+            JsonObject item = new JsonObject();
+            if (rawEntry.containsKey("name")) {
+                item.addProperty("name", rawEntry.get("name").toString());
+            }
+            if (rawEntry.containsKey("version")) {
+                item.addProperty("version", rawEntry.get("version").toString());
+            }
+            if (rawEntry.containsKey("path")) {
+                item.addProperty("path", rawEntry.get("path").toString());
+            }
+
+            item.addProperty("sha256", sha256);
+            item.addProperty("url", buildPublicUrl(file));
+            item.addProperty("file", file);
+            item.addProperty("type", typeDirectory);
+            jsonArray.add(item);
+        }
+        return jsonArray;
+    }
+
+    private String buildPublicUrl(String relativeFile) {
+        String base = getConfig().getString("server.publicBaseUrl", "http://localhost:8080");
+        String filesPath = getConfig().getString("server.filesPath", "/files/");
+        if (!base.endsWith("/")) {
+            base += "/";
+        }
+        String cleanPath = filesPath.startsWith("/") ? filesPath.substring(1) : filesPath;
+        return base + cleanPath + relativeFile;
+    }
+
+    private String resolveChecksum(String relativeFile) throws IOException {
+        String cached = checksumCache.get(relativeFile);
+        if (cached != null && !cached.isBlank()) {
+            return cached;
+        }
+
+        Path file = repositoryRoot.resolve(relativeFile).normalize();
+        if (!Files.exists(file)) {
+            throw new IOException("Configured file does not exist: " + file);
+        }
+
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(Files.readAllBytes(file));
+            String result = HexFormat.of().formatHex(hash);
+            checksumCache.put(relativeFile, result);
+            persistChecksumCache();
+            return result;
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IOException("SHA-256 unavailable", ex);
+        }
+    }
+
+    private void respond(HttpExchange exchange, int status, String body, String contentType) throws IOException {
+        byte[] payload = body.getBytes();
+        exchange.getResponseHeaders().add("Content-Type", contentType);
+        exchange.sendResponseHeaders(status, payload.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(payload);
+        }
+    }
+}
