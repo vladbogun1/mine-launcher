@@ -1,0 +1,15 @@
+name: ServerDrivenModpack
+version: 1.0.0
+main: com.minelauncher.server.ModpackPlugin
+api-version: '1.21'
+authors: [mine-launcher]
+description: Exposes modpack metadata and downloadable files for a server-driven launcher.
+commands:
+  sdmreload:
+    description: Reloads ServerDrivenModpack config and API listener.
+    usage: /sdmreload
+    permission: serverdrivenmodpack.reload
+permissions:
+  serverdrivenmodpack.reload:
+    description: Allows reloading ServerDrivenModpack runtime config.
+    default: op

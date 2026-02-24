@@ -1,0 +1,35 @@
+minecraftVersion: "1.21.1"
+javaVersion: "17"
+loader:
+  type: "fabric" # fabric | forge | vanilla
+  version: "0.16.10"
+server:
+  host: "0.0.0.0"
+  port: 8080
+  allowPortAutoIncrement: true
+  maxPortRetries: 20
+  apiPath: "/api/modpack"
+  filesPath: "/files/"
+  publicBaseUrl: "" # optional; if empty launcher URLs are built from publicScheme/publicHost/server.port
+  publicScheme: "http"
+  publicHost: "localhost"
+
+autoConnect:
+  host: "play.example.com"
+  port: 25565
+
+mods:
+  - name: "Sodium"
+    version: "0.6.0"
+    file: "mods/sodium-fabric.jar"
+    sha256: ""
+
+configs:
+  - path: "config/example.json"
+    file: "configs/example.json"
+    sha256: ""
+
+resourcePacks:
+  - name: "ExampleRP"
+    file: "resourcepacks/example.zip"
+    sha256: ""

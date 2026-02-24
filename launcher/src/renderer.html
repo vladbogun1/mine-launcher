@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MineLauncher</title>
+  <style>
+    :root{--bg:#070b17;--card:#0f172a;--line:#1f2a44;--text:#e2e8f0;--muted:#94a3b8;--accent:#22d3ee;--accent2:#7c3aed;--ok:#22c55e;--warn:#f59e0b}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Arial,sans-serif;background:radial-gradient(1200px 600px at 20% 0%,#14213d 0,#070b17 60%);color:var(--text)}
+    .top{display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1px solid #1a2238;background:rgba(5,10,22,.7);backdrop-filter:blur(8px)}
+    .brand{font-size:24px;font-weight:800;letter-spacing:.5px}
+    .btn{padding:11px 16px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#111a31;border:1px solid var(--line)}
+    .container{padding:24px;max-width:1200px;margin:0 auto}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+    .card{background:linear-gradient(180deg,#0f172a,#0b1224);border:1px solid var(--line);border-radius:16px;padding:16px}
+    .muted{color:var(--muted)} .title{font-size:18px;font-weight:700;margin-bottom:6px}
+    .hidden{display:none}
+    .field{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+    input,select{padding:11px;border-radius:10px;border:1px solid var(--line);background:#0a1020;color:#fff}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .layout{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+    #themePreview{min-height:220px;border:1px dashed #334155;border-radius:14px;padding:16px;background:rgba(15,23,42,.55)}
+    .actions{display:flex;gap:10px;margin-top:12px}
+    .progress{width:100%;height:12px;background:#1f2937;border-radius:999px;overflow:hidden}
+    .progress>div{height:12px;width:0;background:linear-gradient(90deg,var(--ok),var(--accent))}
+    #logs{height:300px;overflow:auto;font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap}
+    .warning{color:var(--warn)}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="brand">MineLauncher • Builds</div>
+    <button class="btn" id="addBuildBtn">Добавить сборку</button>
+  </div>
+
+  <div class="container" id="homeView">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0">Мои сборки</h2>
+      <span class="muted">Можно добавить любое количество серверов</span>
+    </div>
+    <div id="buildsGrid" class="grid"></div>
+  </div>
+
+  <div class="container hidden" id="buildView">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <button id="backBtn" class="btn secondary">← Назад</button>
+      <h2 id="buildTitle" style="margin:0"></h2>
+      <span id="apiMeta" class="muted"></span>
+    </div>
+
+    <div class="layout">
+      <div class="card">
+        <div class="title">Оформление сборки (тема с сервера)</div>
+        <div id="themePreview">Загрузка темы...</div>
+      </div>
+      <div class="card">
+        <div class="title">Управление</div>
+        <p id="warningText" class="warning hidden"></p>
+        <div class="field" style="margin-bottom:8px"><label>Ник для запуска (offline-mode/pirate)</label><input id="usernameInput" value="Player" /></div>
+        <div class="progress"><div id="bar"></div></div>
+        <p id="progressText" class="muted">Ожидание действий.</p>
+        <div class="actions">
+          <button id="playBtn" class="btn">Играть</button>
+        </div>
+        <div style="margin-top:10px" id="mods" class="muted"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="title">Логи</div>
+      <div id="logs"></div>
+    </div>
+  </div>
+
+  <div class="container hidden" id="addModal" style="position:fixed;inset:0;background:rgba(2,6,23,.72)">
+    <div class="card" style="max-width:520px;margin:70px auto">
+      <h3 style="margin-top:0">Добавить сборку</h3>
+      <div class="field"><label>Название</label><input id="nameInput" placeholder="Например: Prado FAMQ" /></div>
+      <div class="field"><label>Сервер (IP / домен)</label><input id="hostInput" placeholder="150.136.127.73" /></div>
+      <div class="field"><label>Ник по умолчанию</label><input id="defaultUsernameInput" value="Player" /></div>
+      <div class="row">
+        <div class="field" style="flex:1"><label>Порт</label><input id="portInput" type="number" value="7777" /></div>
+        <div class="field" style="flex:1"><label>Протокол</label><select id="protocolInput"><option value="http">http</option><option value="https">https</option></select></div>
+      </div>
+      <p class="warning">Разрешён и HTTP, но это небезопасно. Используйте только доверенные серверы.</p>
+      <div class="row" style="justify-content:flex-end"><button id="cancelAdd" class="btn secondary">Отмена</button><button id="saveAdd" class="btn">Создать</button></div>
+    </div>
+  </div>
+
+<script>
+  const homeView = document.getElementById('homeView');
+  const buildView = document.getElementById('buildView');
+  const addModal = document.getElementById('addModal');
+  const buildsGrid = document.getElementById('buildsGrid');
+  const addBuildBtn = document.getElementById('addBuildBtn');
+  const cancelAdd = document.getElementById('cancelAdd');
+  const saveAdd = document.getElementById('saveAdd');
+  const backBtn = document.getElementById('backBtn');
+  const buildTitle = document.getElementById('buildTitle');
+  const apiMeta = document.getElementById('apiMeta');
+  const themePreview = document.getElementById('themePreview');
+  const warningText = document.getElementById('warningText');
+  const playBtn = document.getElementById('playBtn');
+  const mods = document.getElementById('mods');
+  const bar = document.getElementById('bar');
+  const progressText = document.getElementById('progressText');
+  const logs = document.getElementById('logs');
+
+  const nameInput = document.getElementById('nameInput');
+  const hostInput = document.getElementById('hostInput');
+  const portInput = document.getElementById('portInput');
+  const protocolInput = document.getElementById('protocolInput');
+  const defaultUsernameInput = document.getElementById('defaultUsernameInput');
+  const usernameInput = document.getElementById('usernameInput');
+
+  let activeBuild = null;
+
+  function appendLog(line) { logs.textContent += line + '\n'; logs.scrollTop = logs.scrollHeight; }
+  function show(view) {
+    homeView.classList.toggle('hidden', view !== 'home');
+    buildView.classList.toggle('hidden', view !== 'build');
+  }
+
+  async function loadBuilds() {
+    const builds = await window.launcherApi.listBuilds();
+    buildsGrid.innerHTML = '';
+    if (!builds.length) {
+      buildsGrid.innerHTML = '<div class="card"><div class="title">Пока нет сборок</div><div class="muted">Нажмите «Добавить сборку»</div></div>';
+      return;
+    }
+
+    builds.forEach((b) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `<div class="title">${b.name}</div><div class="muted">${b.protocol}://${b.host}:${b.port}</div><div class="actions"><button class="btn open">Открыть</button><button class="btn secondary del">Удалить</button></div>`;
+      card.querySelector('.open').onclick = () => openBuild(b);
+      card.querySelector('.del').onclick = async () => {
+        if (!confirm(`Удалить сборку ${b.name}?`)) return;
+        await window.launcherApi.deleteBuild(b.id);
+        await loadBuilds();
+      };
+      buildsGrid.appendChild(card);
+    });
+  }
+
+  async function openBuild(build) {
+    activeBuild = build;
+    show('build');
+    buildTitle.textContent = build.name;
+    apiMeta.textContent = `${build.protocol}://${build.host}:${build.port}`;
+    usernameInput.value = build.username || 'Player';
+    warningText.classList.add('hidden');
+    themePreview.innerHTML = 'Загрузка темы...';
+    mods.textContent = 'Загрузка манифеста...';
+
+    try {
+      const { manifest, warning, themeUrl } = await window.launcherApi.fetchManifest(build.id);
+      if (warning) {
+        warningText.textContent = `⚠ ${warning}`;
+        warningText.classList.remove('hidden');
+      }
+      mods.innerHTML = (manifest.mods || []).map((m) => `• ${m.name} ${m.version || ''}`).join('<br>') || 'В манифесте нет модов.';
+
+      const theme = await window.launcherApi.loadTheme(build.id);
+      if (theme.ok) {
+        themePreview.innerHTML = `<div class="muted" style="margin-bottom:8px">Тема: ${themeUrl}</div>${theme.html}`;
+      } else {
+        themePreview.innerHTML = `<div style="font-size:22px;font-weight:800">${build.name}</div><p class="muted">Кастомная тема не найдена. Используется красивый дефолтный стиль лаунчера.</p>`;
+      }
+    } catch (e) {
+      mods.textContent = 'Ошибка: ' + e.message;
+      themePreview.innerHTML = '<p class="warning">Не удалось загрузить данные сборки.</p>';
+    }
+  }
+
+  addBuildBtn.onclick = () => { addModal.classList.remove('hidden'); };
+  cancelAdd.onclick = () => { addModal.classList.add('hidden'); };
+
+  saveAdd.onclick = async () => {
+    if (!hostInput.value.trim()) return;
+    const build = await window.launcherApi.createBuild({
+      name: nameInput.value,
+      host: hostInput.value,
+      port: Number(portInput.value || 7777),
+      protocol: protocolInput.value,
+      username: defaultUsernameInput.value || 'Player'
+    });
+    addModal.classList.add('hidden');
+    nameInput.value = '';
+    hostInput.value = '';
+    portInput.value = 7777;
+    protocolInput.value = 'http';
+    defaultUsernameInput.value = 'Player';
+    await loadBuilds();
+    openBuild(build);
+  };
+
+  backBtn.onclick = async () => { show('home'); await loadBuilds(); };
+
+  playBtn.onclick = async () => {
+    if (!activeBuild) return;
+    try {
+      bar.style.width = '0%';
+      progressText.textContent = 'Проверка и обновление файлов...';
+      await window.launcherApi.updateBuildUsername(activeBuild.id, usernameInput.value);
+      await window.launcherApi.fetchManifest(activeBuild.id);
+      await window.launcherApi.syncFiles(activeBuild.id);
+      progressText.textContent = 'Запуск игры...';
+      await window.launcherApi.launchGame(activeBuild.id, usernameInput.value);
+    } catch (e) {
+      appendLog('ERROR: ' + e.message);
+      progressText.textContent = 'Ошибка запуска.';
+    }
+  };
+
+  window.launcherApi.onProgress(({ current, total, file }) => {
+    const percent = Math.floor((current / total) * 100);
+    bar.style.width = percent + '%';
+    progressText.textContent = `${current}/${total}: ${file}`;
+  });
+
+  window.launcherApi.onLog(appendLog);
+  window.launcherApi.getLogs().then((items) => items.forEach(appendLog));
+  loadBuilds();
+</script>
+</body>
+</html>

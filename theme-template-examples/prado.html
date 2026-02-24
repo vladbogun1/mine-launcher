@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prado FAMQ Theme</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --accent:#36f3ff; --accent2:#ff7b45; --text:#f4f7ff; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: 'Montserrat', Arial, sans-serif;
+      background: linear-gradient(rgba(10,14,28,.48), rgba(10,14,28,.78)),
+        url('./assets/prado-gta-mc-bg.svg') center/cover no-repeat fixed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .wrap {
+      width: min(980px, 100%);
+      border: 1px solid rgba(148, 232, 255, 0.25);
+      border-radius: 22px;
+      background: rgba(8, 11, 24, 0.72);
+      backdrop-filter: blur(8px);
+      overflow: hidden;
+      box-shadow: 0 22px 70px rgba(0,0,0,.55);
+    }
+    .hero {
+      padding: 34px;
+      border-bottom: 1px solid rgba(120, 211, 255, 0.2);
+      background: linear-gradient(130deg, rgba(30,48,80,.5), rgba(90,38,38,.35));
+    }
+    .title {
+      margin: 0;
+      font-family: 'Bebas Neue', sans-serif;
+      letter-spacing: 1.8px;
+      font-size: clamp(48px, 9vw, 84px);
+      line-height: .9;
+      text-shadow: 0 0 22px rgba(54, 243, 255, 0.25);
+    }
+    .subtitle { margin-top: 10px; opacity: .9; font-weight: 600; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 18px;
+      padding: 24px;
+    }
+    .panel {
+      border: 1px solid rgba(152, 197, 255, 0.18);
+      border-radius: 14px;
+      padding: 16px;
+      background: rgba(9, 16, 33, 0.7);
+    }
+    .panel h3 { margin: 0 0 8px; font-size: 16px; }
+    .mods { color: #d9eaff; line-height: 1.7; }
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      margin: 3px;
+      border-radius: 999px;
+      border: 1px solid rgba(54, 243, 255, .35);
+      background: rgba(54, 243, 255, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .cta {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-weight: 800;
+      color: #fff;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), #20c9ff 50%, #4890ff);
+      box-shadow: 0 10px 24px rgba(43, 179, 255, .35);
+    }
+    .btn.orange {
+      background: linear-gradient(135deg, #ff9b60, var(--accent2));
+      box-shadow: 0 10px 24px rgba(255, 117, 72, .35);
+    }
+    .tip { font-size: 12px; opacity: .78; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1 class="title">Prado FAMQ</h1>
+      <div class="subtitle">Roleplay vibe как GTA V, но полностью в стиле Minecraft.</div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <h3>Состав сборки</h3>
+        <div class="mods">• Voice Chat / RP Tools / Performance Stack<br>• HD UI / City Textures / Neon Night Pack<br>• Custom server scripts + quality-of-life fixes</div>
+      </div>
+      <div class="panel">
+        <h3>Теги</h3>
+        <span class="badge">PRADO CITY</span>
+        <span class="badge">FAMQ</span>
+        <span class="badge">RP</span>
+        <span class="badge">NEON</span>
+        <div class="cta">
+          <button class="btn">Скачать / Обновить</button>
+          <button class="btn orange">Играть</button>
+        </div>
+        <div class="tip">Дизайн-тема для server-driven launcher (пример кастомного HTML).</div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
