@@ -6,6 +6,8 @@ loader:
 server:
   host: "0.0.0.0"
   port: 8080
+  allowPortAutoIncrement: true
+  maxPortRetries: 20
   apiPath: "/api/modpack"
   filesPath: "/files/"
   publicBaseUrl: "https://example.com"

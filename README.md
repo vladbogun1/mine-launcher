@@ -30,6 +30,7 @@ mvn -B package
 Файл: `server-plugin/src/main/resources/config.yml`
 - `server.publicBaseUrl` должен указывать на HTTPS URL, доступный лаунчеру.
 - Сами файлы должны лежать в `repository/` относительно data folder плагина.
+- Если порт занят, плагин может автоматически пробовать следующий порт (настраивается `server.allowPortAutoIncrement` и `server.maxPortRetries`).
 
 ## 2) Лаунчер (Electron + Node.js)
 

@@ -13,6 +13,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,15 +76,38 @@ public class ModpackPlugin extends JavaPlugin {
     private void startApiServer() throws IOException {
         FileConfiguration config = getConfig();
         String host = config.getString("server.host", "0.0.0.0");
-        int port = config.getInt("server.port", 8080);
+        int basePort = config.getInt("server.port", 8080);
         String apiPath = config.getString("server.apiPath", "/api/modpack");
         String filesPath = config.getString("server.filesPath", "/files/");
+        boolean allowPortAutoIncrement = config.getBoolean("server.allowPortAutoIncrement", true);
+        int maxPortRetries = config.getInt("server.maxPortRetries", 20);
 
-        httpServer = HttpServer.create(new InetSocketAddress(host, port), 0);
-        httpServer.createContext(apiPath, this::handleManifestRequest);
-        httpServer.createContext(filesPath, this::handleFileRequest);
-        httpServer.setExecutor(null);
-        httpServer.start();
+        int retries = allowPortAutoIncrement ? Math.max(0, maxPortRetries) : 0;
+        int currentPort = basePort;
+        IOException lastError = null;
+
+        for (int attempt = 0; attempt <= retries; attempt++) {
+            try {
+                httpServer = HttpServer.create(new InetSocketAddress(host, currentPort), 0);
+                httpServer.createContext(apiPath, this::handleManifestRequest);
+                httpServer.createContext(filesPath, this::handleFileRequest);
+                httpServer.setExecutor(null);
+                httpServer.start();
+
+                if (currentPort != basePort) {
+                    getLogger().warning("Configured port " + basePort + " was busy. API started on fallback port " + currentPort + ".");
+                }
+                return;
+            } catch (BindException bindEx) {
+                lastError = bindEx;
+                if (attempt == retries) {
+                    break;
+                }
+                currentPort++;
+            }
+        }
+
+        throw new IOException("Unable to bind API server on " + host + ":" + basePort + " after " + (retries + 1) + " attempts.", lastError);
     }
 
     private void handleManifestRequest(HttpExchange exchange) throws IOException {
