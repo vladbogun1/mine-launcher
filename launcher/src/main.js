@@ -215,6 +215,7 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
 
   const buildRoot = path.join(appState.root, 'instances', buildId);
   const javaPath = await ensureJava(manifest.javaVersion || '17');
+  await ensureFabricApiIfNeeded(manifest, buildRoot);
   const versionConfig = await ensureGameVersionProfile(manifest, buildRoot);
 
   const options = {
@@ -248,6 +249,58 @@ ipcMain.handle('launch-game', async (_event, buildId, username) => {
 
   return { started: true };
 });
+
+async function ensureFabricApiIfNeeded(manifest, buildRoot) {
+  const loaderType = String(manifest.loader?.type || 'vanilla').toLowerCase();
+  if (loaderType !== 'fabric') {
+    return;
+  }
+
+  const modsDir = path.join(buildRoot, 'mods');
+  await fs.mkdir(modsDir, { recursive: true });
+  const modFiles = await fs.readdir(modsDir).catch(() => []);
+  const hasFabricApi = modFiles.some((file) => file.toLowerCase().includes('fabric-api') && file.toLowerCase().endsWith('.jar'));
+  if (hasFabricApi) {
+    return;
+  }
+
+  const mcVersion = manifest.minecraftVersion;
+  const url = `https://api.modrinth.com/v2/project/fabric-api/version?loaders=[%22fabric%22]&game_versions=[%22${encodeURIComponent(mcVersion)}%22]`;
+  log(`fabric-api not found, requesting compatible version for ${mcVersion}`);
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'mine-launcher/1.0 (server-driven-launcher)'
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to resolve fabric-api: ${response.status}`);
+  }
+
+  const versions = await response.json();
+  if (!Array.isArray(versions) || versions.length === 0) {
+    throw new Error(`No fabric-api version found for Minecraft ${mcVersion}`);
+  }
+
+  const firstVersion = versions[0];
+  const primaryFile = (firstVersion.files || []).find((f) => f.primary) || (firstVersion.files || [])[0];
+  if (!primaryFile || !primaryFile.url || !primaryFile.filename) {
+    throw new Error('fabric-api response does not contain downloadable file');
+  }
+
+  const destination = path.join(modsDir, primaryFile.filename);
+  log(`Downloading fabric-api dependency ${primaryFile.filename}`);
+  await downloadFile(primaryFile.url, destination);
+
+  if (primaryFile.hashes && primaryFile.hashes.sha512) {
+    const data = await fs.readFile(destination);
+    const actual = crypto.createHash('sha512').update(data).digest('hex').toLowerCase();
+    if (actual !== String(primaryFile.hashes.sha512).toLowerCase()) {
+      throw new Error('fabric-api checksum mismatch after download');
+    }
+  }
+
+  log(`fabric-api installed: ${primaryFile.filename}`);
+}
 
 async function ensureGameVersionProfile(manifest, buildRoot) {
   const mcVersion = manifest.minecraftVersion;

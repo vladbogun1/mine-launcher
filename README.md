@@ -112,6 +112,7 @@ plugins/
 - Проверка SHA-256 после скачивания.
 - Сборка структуры инстанса (`mods/`, `config/`, `resourcepacks/`).
 - Запуск Minecraft через `minecraft-launcher-core` с поддержкой Fabric профиля из манифеста (`loader.type=fabric`, `loader.version`).
+- Для Fabric лаунчер автоматически подтягивает `fabric-api`, если в `mods/` он отсутствует (по версии Minecraft через Modrinth API).
 - Auto-connect к серверу (через modern quickPlay, без устаревших JVM-флагов `--server/--port`).
 - Авто-установка Java 17 (Temurin) для Windows x64.
 - UI с главным экраном множества сборок, кнопками «Добавить сборку»/«Удалить сборку», и одной кнопкой «Играть» (она сама проверяет/обновляет файлы перед запуском), встроенными логами.
