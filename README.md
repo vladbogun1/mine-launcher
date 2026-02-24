@@ -62,6 +62,43 @@ plugins/
 - `path` в секции `configs` — это путь, куда файл должен попасть у клиента (например, `config/example.json`).
 - Если `sha256` пустой, плагин посчитает его автоматически и сохранит в `checksums.yml`.
 
+
+
+### Где хранить темы на сервере
+Лаунчер поддерживает 2 варианта источника темы:
+
+1. `themeUrl` в JSON манифесте (`/api/modpack`) — полный URL до HTML темы.
+2. Fallback по умолчанию: `http(s)://<host>:<port>/theme.html`.
+
+Рекомендуемая структура рядом с API/файлами:
+
+```text
+<server-root>/
+├── plugins/
+│   └── ServerDrivenModpack/
+│       ├── config.yml
+│       ├── checksums.yml
+│       └── repository/
+│           ├── mods/
+│           ├── configs/
+│           └── resourcepacks/
+└── web/                       # любой ваш web-root (nginx/caddy/apache/static)
+    ├── theme.html             # дефолтная тема для этой сборки
+    └── assets/
+        ├── logo.png
+        ├── bg.jpg
+        └── custom.css
+```
+
+Важно:
+- Тема — обычный HTML, который лаунчер вставляет в блок превью сборки.
+- Все ресурсы темы (картинки/шрифты/CSS) должны быть доступны по HTTP(S) URL.
+- Если используете относительные пути в теме (`./assets/...`), они должны быть корректны относительно URL самой темы.
+- Если у вас несколько сборок, удобно отдавать разные темы по разным URL, например:
+  - `https://cdn.example.com/themes/prado/theme.html`
+  - `https://cdn.example.com/themes/nether/theme.html`
+  и указывать эти ссылки в `themeUrl` для соответствующего манифеста.
+
 ## 2) Лаунчер (Electron + Node.js)
 
 ### Возможности
